@@ -388,7 +388,6 @@ elif page == "NCR Analysis":
 
     # Define the categories
     categories = [
-        "Bispecifics",
         "CDK 4/6 Orals",
         "Biosim",
         "BTK",
