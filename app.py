@@ -636,4 +636,4 @@ elif page == "NCR Analysis":
     st.plotly_chart(fig, use_container_width=True)
 
 if page == "ASP Prediction":
-    st.subheader("ASP Prediction Test with FB Prophet model")
+    st.subheader("ASP Prediction Test with FB Prophet")
