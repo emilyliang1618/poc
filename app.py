@@ -220,7 +220,7 @@ def to_excel(df, sheet_name='Rosters'):
 
 #Streamlit Application
 st.sidebar.title("Select a POC")
-page = st.sidebar.radio("", ["Eli Lilly Roster", "Genentech Roster", "Unity Roster", "NCR Analysis"])
+page = st.sidebar.radio("", ["Eli Lilly Roster", "Genentech Roster", "Unity Roster", "NCR Analysis", "ASP Prediction"])
 
 if page == "Eli Lilly Roster":
     st.subheader("Create Roster for Eli Lilly")
@@ -634,3 +634,6 @@ elif page == "NCR Analysis":
 
     # Display the plot
     st.plotly_chart(fig, use_container_width=True)
+
+if page == "ASP Prediction":
+    st.subheader("ASP Prediction Test with FB Prophet model")
