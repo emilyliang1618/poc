@@ -90,7 +90,7 @@ def create_unity_roster(df, product_name, quarter, year):
 
         # Filter for entries that are not Parent ID 70297 or 70581 and label the roster group as 'Unity Others'
         df_unity_others = df[~df['Parent'].isin([70297, 70581])].copy()
-        df_unity_others['Roster Group'] = 'Unity Others'
+        df_unity_others['Roster Group'] = 'Unity'
 
         # Combine the two DataFrames
         new_df = pd.concat([df_txO_md, df_unity_others])
