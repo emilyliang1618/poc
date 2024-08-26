@@ -82,8 +82,21 @@ def create_unity_roster(df, product_name, quarter, year):
         st.error("Columns 'Start Date' and/or 'End Date' are missing from the uploaded file.")
         return pd.DataFrame(), ""
 
+        # Logic for Remicade and Infliximab
+    if product_name.lower() in ['remicade', 'infliximab']:
+        # Filter for Parent ID 70297 or 70581 and label the roster group as 'TxO and Maryland'
+        df_txO_md = df[df['Parent'].isin([70297, 70581])].copy()
+        df_txO_md['Roster Group'] = 'TxO and Maryland'
+
+        # Filter for entries that are not Parent ID 70297 or 70581 and label the roster group as 'Unity Others'
+        df_unity_others = df[~df['Parent'].isin([70297, 70581])].copy()
+        df_unity_others['Roster Group'] = 'Unity Others'
+
+        # Combine the two DataFrames
+        new_df = pd.concat([df_txO_md, df_unity_others])
+
     # Logic for Jemperli
-    if product_name.lower() == 'jemperli':
+    elif product_name.lower() == 'jemperli':
         # Filter for Parent ID 70297 and label the roster group as TxO
         df_70297 = df[df['Parent'] == 70297].copy()
         df_70297['Roster Group'] = 'TxO'
@@ -277,7 +290,7 @@ elif page == "Unity Roster":
     product_name = st.selectbox(
         "Select the Drug Product",
         sorted(["Jemperli", "Alunbrig", "Vanflyta", "Tavalisse", "Bavencio", "Inlyta", "Lorbrena", "Oxbryta", "Ruxience", "Trazimera",
-                "Zirabev", "Elrexfio", "Cinvanti", "Ibrance", "Sustol", "Injectafer", "Nerlynx"])
+                "Zirabev", "Elrexfio", "Cinvanti", "Ibrance", "Sustol", "Injectafer", "Nerlynx", "Remicade", "Infliximab"])
     )
 
     # Step 3: Upload Base Roster
