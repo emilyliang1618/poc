@@ -109,10 +109,15 @@ def create_unity_roster(df, product_name, quarter, year):
         new_df = pd.concat([df_70297, df_not_70297])
 
     # Logic for Alunbrig and similar products
-    elif product_name.lower() in ['alunbrig', 'bavencio', 'inlyta', 'lorbrena', 'oxbryta', 'ruxience', 'trazimera', 'zirabev', 'elrexfio']:
+    elif product_name.lower() in ['alunbrig', 'bavencio', 'inlyta', 'lorbrena', 'oxbryta', 'ruxience', 'trazimera',
+                                  'zirabev', 'elrexfio']:
         # Filter for Group 'ALCS' and label it as 'OM'
         df_alcs = df[df['Group'] == 'ALCS'].copy()
         df_alcs['Roster Group'] = 'OM'
+
+        # Update product_name to 'OXBRYTA' if applicable
+        if product_name.lower() == 'oxbryta':
+            product_name = 'OXBRYTA'
 
         # Use df_alcs as the final DataFrame
         new_df = df_alcs.copy()
@@ -357,127 +362,101 @@ elif page == "Unity Roster":
 #NEW
 elif page == "NCR Analysis":
 
-    st.title("NCR Analysis Test")
+    # Load the data
+    @st.cache_data
+    def load_data():
+        return pd.read_csv('data.csv')
 
-    # Define the GPOs
-    gpos = [
-        "Onmark Standard",
-        "Onmark United",
-        "Perform",
-        "Perform Plus",
-        "Unity",
-        "Unity USON"
-    ]
 
-    # Sample data
-    pricing_data = {
-        "Ibrance IBRANCE 125MG CAPSULE 21/EA": {
-            "WAC": 15982,
-            "AWP": 19178.87,
-            "Contract Prices": {gpo: 14544 for gpo in gpos}
-        },
-        "Kisqali KISQALI 600MG DAILY TAB 3X21 BLST 63/EA": {
-            "WAC": 17685,
-            "AWP": 21222.44,
-            "Contract Prices": {gpo: 15917 for gpo in gpos}
-        },
-        "Verzenio VERZENIO 150MG TAB BLSTR 14/EA": {
-            "WAC": 3851,
-            "AWP": 4621.72,
-            "Contract Prices": {
-                "Onmark Standard": 3505,
-                **{gpo: 3466 for gpo in gpos if gpo != "Onmark Standard"}
-            }
-        },
-        "Verzenio VERZENIO 150MG TAB BLSTR 14/EA X 4": {
-            "WAC": 3851 * 4,
-            "AWP": 4621.72 * 4,
-            "Contract Prices": {
-                "Onmark Standard": 3505 * 4,
-                **{gpo: 3466 * 4 for gpo in gpos if gpo != "Onmark Standard"}
-            }
-        }
-    }
+    df = load_data()
 
-    # Define the categories
-    categories = [
-        "CDK 4/6 Orals",
-        "Biosim",
-        "BTK",
-        "IO",
-        "Ultomiris/Soliris",
-        "Monoferric"
-    ]
+    st.title('NCR Analysis')
 
-    # Initialize session state for analysis data if not already initialized
+    # Initialize session state for analysis data if it doesn't exist
     if 'analysis_data' not in st.session_state:
         st.session_state.analysis_data = []
+    if 'rebate_tiers' not in st.session_state:
+        st.session_state.rebate_tiers = []
 
-    # User selects a category
-    selected_category = st.selectbox("Select a category:", categories)
+    # Step 1: Select Product Type (Category)
+    product_types = df['Product Type'].unique()
+    selected_category = st.selectbox('Select Product Type', product_types)
 
-    # Products for the selected category
-    if selected_category == "CDK 4/6 Orals":
-        products = list(pricing_data.keys())
-    else:
-        products = ["Product 1", "Product 2"]  # Placeholder for other categories
+    # Step 2: Select Product
+    products = df[df['Product Type'] == selected_category]['Product Name'].unique()
+    selected_product = st.selectbox('Select Product', products)
 
-    # User selects a product
-    selected_product = st.selectbox("Select a product:", products)
+    # Step 3: Select GPO Type
+    gpo_types = df[(df['Product Type'] == selected_category) &
+                   (df['Product Name'] == selected_product)]['GPO Type'].unique()
+    selected_gpo = st.selectbox('Select GPO Type', gpo_types)
 
-    # User selects a single GPO
-    selected_gpo = st.selectbox("Select a GPO for the product:", gpos)
+    # Step 4: Select Report Year and Quarter
+    years = df['Report Year'].unique()
+    quarters = df['Report Quarter'].unique()
+    selected_year = st.selectbox('Select Report Year', years)
+    selected_quarter = st.selectbox('Select Report Quarter', quarters)
 
-    # Allow the user to specify the rebate type (WAC or Contract Price)
-    rebate_type = st.selectbox("Rebate Type (W or C):", ["W", "C"])
+    # Step 5: Get pricing information
+    if selected_product and selected_gpo:
+        pricing_info = df[(df['Product Type'] == selected_category) &
+                          (df['Product Name'] == selected_product) &
+                          (df['GPO Type'] == selected_gpo) &
+                          (df['Report Year'] == selected_year) &
+                          (df['Report Quarter'] == selected_quarter)].iloc[0]
 
-    # Allow the user to specify the number of rebate tiers
-    num_rebate_tiers = st.number_input("Number of Rebate Tiers:", min_value=1, max_value=5, step=1)
+        product_usage = pricing_info['Product Usage']  # 'Oral' or 'Injectable'
+        wac = pricing_info['WAC per Unit']
+        contract_price = pricing_info['Contract per Unit']
 
-    # Collect rebate percentages using text input
+        if product_usage == 'Oral':
+            reimbursement = pricing_info['AWP']
+        else:
+            reimbursement = pricing_info['ASP']
+
+        rebate_type = pricing_info['Rebate Type']
+
+        # Create a list of lists to display without index
+        pricing_data = [
+            ['Product Type', product_usage],
+            ['WAC', f"${wac:,.2f}"],
+            ['Contract Price', f"${contract_price:,.2f}"],
+            ['Reimbursement', f"${reimbursement:,.2f}"],
+            ['Rebate Type', rebate_type]
+        ]
+
+        # Display the table using st.table
+        st.table(pd.DataFrame(pricing_data, columns=['Description', 'Details']).style.hide(axis="index"))
+
+    # Step 6: Collect rebate percentages
+    st.write("Enter Rebate Tiers:")
+    num_rebate_tiers = st.number_input("Number of rebate tiers", min_value=1, value=1)
     rebate_tiers = []
     for i in range(num_rebate_tiers):
-        tier = st.text_input(f"Rebate Tier {i + 1} (%)", value="10.0")
+        tier = st.text_input(f"Rebate Tier {i + 1} (%)", value="10.0", key=f"tier_{i}")
         try:
             rebate_tiers.append(float(tier))
         except ValueError:
             st.warning(f"Invalid input for Tier {i + 1}. Please enter a numeric value.")
             rebate_tiers.append(0.0)
 
-    # Get the relevant pricing data
-    if selected_product and selected_gpo:
-        wac = pricing_data[selected_product]["WAC"]
-        contract_price = pricing_data[selected_product]["Contract Prices"][selected_gpo]
-        awp = pricing_data[selected_product]["AWP"]
-
-        # Calculate Reimbursement (AWP - 19.5%)
-        reimbursement = awp - (0.195 * awp)
-
-    # Add the selection to the analysis data
+    # Step 7: Add to Analysis
     if st.button("Add to Analysis"):
         if selected_product and selected_gpo:
-            # Calculate the % off WAC to get to the Contract Price
             percent_off_wac = ((wac - contract_price) / wac) * 100
 
-            # Add each rebate tier as a separate row
             for tier in rebate_tiers:
                 if rebate_type == "W":
                     rebate_amount = (tier / 100) * wac
                 elif rebate_type == 'C':
                     rebate_amount = (tier / 100) * contract_price
 
-                # Calculate Net Price (Contract Price - Rebate $)
                 net_price = contract_price - rebate_amount
-
-                # Calculate Net Recovery $ (Net Price - Reimbursement)
                 net_recovery = reimbursement - net_price
-
-                # Calculate NCR % (Net Recovery $ / Net Price * 100)
                 ncr_percent = (net_recovery / net_price) * 100
-
-                # Calculate NRR % (Net Recovery $ / Reimbursement * 100)
                 nrr_percent = (net_recovery / reimbursement) * 100
 
+                # No duplicate check; add every entry
                 st.session_state.analysis_data.append({
                     "Category": selected_category,
                     "Product": selected_product,
@@ -499,12 +478,18 @@ elif page == "NCR Analysis":
         else:
             st.warning("Please select both a product and a GPO.")
 
-    # Option to remove specific entries
+    # Step 8: Option to remove specific entries
     if st.session_state.analysis_data:
+        # Create a set of unique entries for the selectbox
+        unique_entries = set(
+            f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}"
+            for item in st.session_state.analysis_data
+        )
+
+        # Convert the set back to a list for the selectbox
         entry_to_remove = st.selectbox(
             "Select an entry to remove:",
-            [f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}" for item in
-             st.session_state.analysis_data]
+            list(unique_entries)
         )
 
         if st.button("Remove Selected Entry"):
@@ -514,25 +499,68 @@ elif page == "NCR Analysis":
             ]
             st.success(f"Removed: {entry_to_remove} from analysis.")
 
-    # Reset the analysis data (placed before the DataFrame)
-    if st.button("Reset Analysis"):
-        st.session_state.analysis_data = []
-        st.success("Analysis data reset!")
+    # Step 10: Display the analysis results
+    if st.session_state.analysis_data:
+        st.write("Analysis Results:")
 
-    # Convert the analysis data to a DataFrame
-    analysis_df = pd.DataFrame(st.session_state.analysis_data)
+        # Convert session data to DataFrame
+        analysis_df = pd.DataFrame(st.session_state.analysis_data)
 
-    # Display the DataFrame
-    st.subheader("Analysis Preview")
-    st.dataframe(analysis_df)
+        # Remove duplicate rows in the DataFrame
+        analysis_df = analysis_df.drop_duplicates()
 
-    # Dynamic Reimbursement Adjustment Section
+        # Convert "Rebate %" column to float for sorting
+        analysis_df['Rebate %'] = analysis_df['Rebate %'].str.replace('%', '').astype(float)
+
+        # Sort the DataFrame first by Product, then by GPO, and then by Rebate %
+        analysis_df.sort_values(by=['Product', 'GPO', 'Rebate %'], ascending=[True, True, True], inplace=True)
+
+        # Display the DataFrame without duplicates
+        st.dataframe(analysis_df)
+
+        # Add download button for the results
+        csv = analysis_df.to_csv(index=False)
+        st.download_button(
+            label="Download results as CSV",
+            data=csv,
+            file_name="ncr_analysis_results.csv",
+            mime="text/csv",
+        )
+    else:
+        st.write("No analysis data yet. Add products to begin the analysis.")
+
+    st.markdown("---")
+
+    # Step 11: What-If Analysis
     st.subheader("What-If Analysis: Adjust Reimbursement")
 
-    # User selects the rebate tier for adjustment
-    tier_labels = [f"Tier {i + 1}" for i in range(num_rebate_tiers)]
-    selected_tier_label = st.selectbox("Select Rebate Tier to Adjust:", tier_labels)
-    selected_tier_index = tier_labels.index(selected_tier_label)
+    # User selects the product and GPO from the analysis results
+    selected_product = st.selectbox("Select Product:", analysis_df["Product"].unique())
+    selected_gpo = st.selectbox("Select GPO:", analysis_df[analysis_df["Product"] == selected_product]["GPO"].unique())
+
+    # Filter the analysis_df for the selected product and GPO to get corresponding rebate tiers and reimbursement
+    filtered_analysis = analysis_df[(analysis_df["Product"] == selected_product) & (analysis_df["GPO"] == selected_gpo)]
+
+    # Create tier labels based on the filtered data (assuming you want the unique Rebate % as tiers)
+    if not filtered_analysis.empty:
+        unique_tiers = filtered_analysis["Rebate %"].unique()
+        tier_labels = [f"{tier}" for tier in unique_tiers]  # Use the actual rebate percentages as labels
+
+        # Get the reimbursement value from the filtered DataFrame
+        reimbursement_str = filtered_analysis["Reimbursement"].values[0]  # Get the string value
+        reimbursement = float(reimbursement_str.replace('$', '').replace(',', '').strip())  # Convert to float
+    else:
+        tier_labels = []
+
+    # User selects the rebate tier for adjustment based on selected product and GPO
+    if tier_labels:
+        selected_tier_label = st.selectbox("Select Rebate Tier to Adjust:", tier_labels)
+        selected_tier_index = tier_labels.index(selected_tier_label)
+
+        # Get original tier from filtered analysis
+        original_tier = float(selected_tier_label)  # Make sure to convert to float for calculations
+    else:
+        st.warning("No tiers available for the selected product and GPO.")
 
     # Allow user to specify the range of adjustments with a slider
     min_adjustment = -15
@@ -549,103 +577,344 @@ elif page == "NCR Analysis":
     # Generate adjustment values based on the selected range
     selected_adjustments = list(range(selected_range[0], selected_range[1] + 1, step))
 
-    # Calculate the new NCR% for each adjustment
-    if selected_product and selected_gpo and rebate_tiers:
+    # Ensure that necessary variables are defined
+    # Ensure that necessary variables are defined
+    if selected_product and selected_gpo and original_tier is not None:
         ncr_results = []
-        original_tier = rebate_tiers[selected_tier_index]
-        selected_tier_label = f"Tier {selected_tier_index + 1}"  # Get the tier label
+
+        # Get net price from filtered analysis for the selected product and GPO
+        net_price_str = filtered_analysis["Net Price"].values[0]  # Assuming 'Net Price' is the correct column name
+        # Remove the dollar sign and convert to float
+        net_price = float(net_price_str.replace('$', '').replace(',', '').strip())  # Convert to float
 
         for adjustment in selected_adjustments:
             # Adjust reimbursement instead of rebate percentage
             adjusted_reimbursement = reimbursement * (1 + adjustment / 100)
 
-            # Calculate Net Price (Contract Price - Rebate $)
-            if rebate_type == "W":
-                rebate_amount = (original_tier / 100) * wac
-            elif rebate_type == 'C':
-                rebate_amount = (original_tier / 100) * contract_price
-            net_price = contract_price - rebate_amount
-
-            # Calculate Net Recovery $ (Net Price - Adjusted Reimbursement)
+            # Calculate Net Recovery $ (Adjusted Reimbursement - Net Price)
             net_recovery = adjusted_reimbursement - net_price
 
-            # Calculate NCR % (Net Recovery $ / Net Price * 100)
-            ncr_percent = (net_recovery / net_price) * 100
+            # Calculate NCR % (Net Recovery $ / Reimbursement * 100)
+            ncr_percent = (net_recovery / reimbursement) * 100  # Use reimbursement instead of net_price
 
+            # Append results, including Product and GPO
             ncr_results.append({
+                "Product": selected_product,
+                "GPO": selected_gpo,
                 "Tier": selected_tier_label,
                 "Original Rebate %": original_tier,
                 "Adjustment (%)": adjustment,
                 "Adjusted Reimbursement ($)": adjusted_reimbursement,
+                "New Net Recovery ($)": net_recovery,
                 "New NCR (%)": ncr_percent
             })
 
-        # # Convert the results to a DataFrame
-        # ncr_df = pd.DataFrame(ncr_results)
-        # ncr_df = ncr_df.sort_values(by="New NCR (%)")
-        #
-        #
-        # # Display the DataFrame
-        # st.subheader("NCR Results for Selected Rebate Tier")
-        # st.dataframe(ncr_df)
-
-        # Convert the results to a DataFrame
+        # Create DataFrame from results
         ncr_df = pd.DataFrame(ncr_results)
-        ncr_df = ncr_df.sort_values(by="New NCR (%)")
+
 
         # Function to highlight the original reimbursement row
         def highlight_original_reimbursement(s):
             is_original = s['Adjustment (%)'] == 0
             return ['background-color: yellow' if is_original else '' for _ in s]
 
-       # Apply the highlight function to the DataFrame
+
+        # Apply the highlight function to the DataFrame
         styled_df = ncr_df.style.apply(highlight_original_reimbursement, axis=1)
-        st.dataframe(styled_df, height=800)  # Adjust height as needed
 
-    # Generate plot data for all tiers
-    plot_data = []
-    for i, rebate in enumerate(rebate_tiers):
-        original_tier = rebate
-        tier_label = f"Tier {i + 1}"  # Get the tier label
+        # Display the styled DataFrame
+        st.dataframe(styled_df)  # Adjust height as needed
 
-        for adjustment in selected_adjustments:
-            adjusted_reimbursement = reimbursement * (1 + adjustment / 100)
+    else:
+        st.warning("Please select a product, GPO, and rebate tiers to perform the What-If Analysis.")
 
-            # Calculate Net Price (Contract Price - Rebate $)
-            if rebate_type == "W":
-                rebate_amount = (original_tier / 100) * wac
-            elif rebate_type == 'C':
-                rebate_amount = (original_tier / 100) * contract_price
-            net_price = contract_price - rebate_amount
+    # st.title("NCR Analysis Test")
+    #
+    # # Define the GPOs
+    # gpos = [
+    #     "Onmark Standard",
+    #     "Onmark United",
+    #     "Perform",
+    #     "Perform Plus",
+    #     "Unity",
+    #     "Unity USON"
+    # ]
+    #
+    # # Sample data
+    # pricing_data = {
+    #     "Ibrance IBRANCE 125MG CAPSULE 21/EA": {
+    #         "WAC": 15982,
+    #         "AWP": 19178.87,
+    #         "Contract Prices": {gpo: 14544 for gpo in gpos}
+    #     },
+    #     "Kisqali KISQALI 600MG DAILY TAB 3X21 BLST 63/EA": {
+    #         "WAC": 17685,
+    #         "AWP": 21222.44,
+    #         "Contract Prices": {gpo: 15917 for gpo in gpos}
+    #     },
+    #     "Verzenio VERZENIO 150MG TAB BLSTR 14/EA": {
+    #         "WAC": 3851,
+    #         "AWP": 4621.72,
+    #         "Contract Prices": {
+    #             "Onmark Standard": 3505,
+    #             **{gpo: 3466 for gpo in gpos if gpo != "Onmark Standard"}
+    #         }
+    #     },
+    #     "Verzenio VERZENIO 150MG TAB BLSTR 14/EA X 4": {
+    #         "WAC": 3851 * 4,
+    #         "AWP": 4621.72 * 4,
+    #         "Contract Prices": {
+    #             "Onmark Standard": 3505 * 4,
+    #             **{gpo: 3466 * 4 for gpo in gpos if gpo != "Onmark Standard"}
+    #         }
+    #     }
+    # }
+    #
+    # # Define the categories
+    # categories = [
+    #     "CDK 4/6 Orals",
+    #     "Biosim",
+    #     "BTK",
+    #     "IO",
+    #     "Ultomiris/Soliris",
+    #     "Monoferric"
+    # ]
+    #
+    # # Initialize session state for analysis data if not already initialized
+    # if 'analysis_data' not in st.session_state:
+    #     st.session_state.analysis_data = []
+    #
+    # # User selects a category
+    # selected_category = st.selectbox("Select a category:", categories)
+    #
+    # # Products for the selected category
+    # if selected_category == "CDK 4/6 Orals":
+    #     products = list(pricing_data.keys())
+    # else:
+    #     products = ["Product 1", "Product 2"]  # Placeholder for other categories
+    #
+    # # User selects a product
+    # selected_product = st.selectbox("Select a product:", products)
+    #
+    # # User selects a single GPO
+    # selected_gpo = st.selectbox("Select a GPO for the product:", gpos)
+    #
+    # # Allow the user to specify the rebate type (WAC or Contract Price)
+    # rebate_type = st.selectbox("Rebate Type (W or C):", ["W", "C"])
+    #
+    # # Allow the user to specify the number of rebate tiers
+    # num_rebate_tiers = st.number_input("Number of Rebate Tiers:", min_value=1, max_value=5, step=1)
+    #
+    # # Collect rebate percentages using text input
+    # rebate_tiers = []
+    # for i in range(num_rebate_tiers):
+    #     tier = st.text_input(f"Rebate Tier {i + 1} (%)", value="10.0")
+    #     try:
+    #         rebate_tiers.append(float(tier))
+    #     except ValueError:
+    #         st.warning(f"Invalid input for Tier {i + 1}. Please enter a numeric value.")
+    #         rebate_tiers.append(0.0)
+    #
+    # # Get the relevant pricing data
+    # if selected_product and selected_gpo:
+    #     wac = pricing_data[selected_product]["WAC"]
+    #     contract_price = pricing_data[selected_product]["Contract Prices"][selected_gpo]
+    #     awp = pricing_data[selected_product]["AWP"]
+    #
+    #     # Calculate Reimbursement (AWP - 19.5%)
+    #     reimbursement = awp - (0.195 * awp)
+    #
+    # # Add the selection to the analysis data
+    # if st.button("Add to Analysis"):
+    #     if selected_product and selected_gpo:
+    #         # Calculate the % off WAC to get to the Contract Price
+    #         percent_off_wac = ((wac - contract_price) / wac) * 100
+    #
+    #         # Add each rebate tier as a separate row
+    #         for tier in rebate_tiers:
+    #             if rebate_type == "W":
+    #                 rebate_amount = (tier / 100) * wac
+    #             elif rebate_type == 'C':
+    #                 rebate_amount = (tier / 100) * contract_price
+    #
+    #             # Calculate Net Price (Contract Price - Rebate $)
+    #             net_price = contract_price - rebate_amount
+    #
+    #             # Calculate Net Recovery $ (Net Price - Reimbursement)
+    #             net_recovery = reimbursement - net_price
+    #
+    #             # Calculate NCR % (Net Recovery $ / Net Price * 100)
+    #             ncr_percent = (net_recovery / net_price) * 100
+    #
+    #             # Calculate NRR % (Net Recovery $ / Reimbursement * 100)
+    #             nrr_percent = (net_recovery / reimbursement) * 100
+    #
+    #             st.session_state.analysis_data.append({
+    #                 "Category": selected_category,
+    #                 "Product": selected_product,
+    #                 "GPO": selected_gpo,
+    #                 "WAC": f"${wac:,}",
+    #                 "Contract Price": f"${contract_price:,}",
+    #                 "% off WAC": f"{percent_off_wac:.2f}%",
+    #                 "Rebate Type": rebate_type,
+    #                 "Rebate %": f"{tier:.2f}%",
+    #                 "Rebate $": f"${rebate_amount:,.2f}",
+    #                 "Net Price": f"${net_price:,.2f}",
+    #                 "Reimbursement": f"${reimbursement:,.2f}",
+    #                 "Net Recovery $": f"${net_recovery:,.2f}",
+    #                 "NCR %": f"{ncr_percent:.2f}%",
+    #                 "NRR %": f"{nrr_percent:.2f}%"
+    #             })
+    #
+    #         st.success(f"Added: {selected_product} with {selected_gpo} to analysis!")
+    #     else:
+    #         st.warning("Please select both a product and a GPO.")
+    #
+    # # Option to remove specific entries
+    # if st.session_state.analysis_data:
+    #     entry_to_remove = st.selectbox(
+    #         "Select an entry to remove:",
+    #         [f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}" for item in
+    #          st.session_state.analysis_data]
+    #     )
+    #
+    #     if st.button("Remove Selected Entry"):
+    #         st.session_state.analysis_data = [
+    #             item for item in st.session_state.analysis_data
+    #             if f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}" != entry_to_remove
+    #         ]
+    #         st.success(f"Removed: {entry_to_remove} from analysis.")
+    #
+    # # Reset the analysis data (placed before the DataFrame)
+    # if st.button("Reset Analysis"):
+    #     st.session_state.analysis_data = []
+    #     st.success("Analysis data reset!")
+    #
+    # # Convert the analysis data to a DataFrame
+    # analysis_df = pd.DataFrame(st.session_state.analysis_data)
+    #
+    # # Display the DataFrame
+    # st.subheader("Analysis Preview")
+    # st.dataframe(analysis_df)
+    #
+    # # Dynamic Reimbursement Adjustment Section
+    # st.subheader("What-If Analysis: Adjust Reimbursement")
+    #
+    # # User selects the rebate tier for adjustment
+    # tier_labels = [f"Tier {i + 1}" for i in range(num_rebate_tiers)]
+    # selected_tier_label = st.selectbox("Select Rebate Tier to Adjust:", tier_labels)
+    # selected_tier_index = tier_labels.index(selected_tier_label)
+    #
+    # # Allow user to specify the range of adjustments with a slider
+    # min_adjustment = -15
+    # max_adjustment = 15
+    # step = 1
+    # selected_range = st.slider(
+    #     "Select Reimbursement Adjustment Range (%):",
+    #     min_value=min_adjustment,
+    #     max_value=max_adjustment,
+    #     value=(min_adjustment, max_adjustment),
+    #     step=step
+    # )
+    #
+    # # Generate adjustment values based on the selected range
+    # selected_adjustments = list(range(selected_range[0], selected_range[1] + 1, step))
+    #
+    # # Calculate the new NCR% for each adjustment
+    # if selected_product and selected_gpo and rebate_tiers:
+    #     ncr_results = []
+    #     original_tier = rebate_tiers[selected_tier_index]
+    #     selected_tier_label = f"Tier {selected_tier_index + 1}"  # Get the tier label
+    #
+    #     for adjustment in selected_adjustments:
+    #         # Adjust reimbursement instead of rebate percentage
+    #         adjusted_reimbursement = reimbursement * (1 + adjustment / 100)
+    #
+    #         # Calculate Net Price (Contract Price - Rebate $)
+    #         if rebate_type == "W":
+    #             rebate_amount = (original_tier / 100) * wac
+    #         elif rebate_type == 'C':
+    #             rebate_amount = (original_tier / 100) * contract_price
+    #         net_price = contract_price - rebate_amount
+    #
+    #         # Calculate Net Recovery $ (Net Price - Adjusted Reimbursement)
+    #         net_recovery = adjusted_reimbursement - net_price
+    #
+    #         # Calculate NCR % (Net Recovery $ / Net Price * 100)
+    #         ncr_percent = (net_recovery / net_price) * 100
+    #
+    #         ncr_results.append({
+    #             "Tier": selected_tier_label,
+    #             "Original Rebate %": original_tier,
+    #             "Adjustment (%)": adjustment,
+    #             "Adjusted Reimbursement ($)": adjusted_reimbursement,
+    #             "New NCR (%)": ncr_percent
+    #         })
+    #
+    #     # # Convert the results to a DataFrame
+    #     # ncr_df = pd.DataFrame(ncr_results)
+    #     # ncr_df = ncr_df.sort_values(by="New NCR (%)")
+    #     #
+    #     #
+    #     # # Display the DataFrame
+    #     # st.subheader("NCR Results for Selected Rebate Tier")
+    #     # st.dataframe(ncr_df)
+    #
+    #     # Convert the results to a DataFrame
+    #     ncr_df = pd.DataFrame(ncr_results)
+    #     ncr_df = ncr_df.sort_values(by="New NCR (%)")
+    #
+    #     # Function to highlight the original reimbursement row
+    #     def highlight_original_reimbursement(s):
+    #         is_original = s['Adjustment (%)'] == 0
+    #         return ['background-color: yellow' if is_original else '' for _ in s]
+    #
+    #    # Apply the highlight function to the DataFrame
+    #     styled_df = ncr_df.style.apply(highlight_original_reimbursement, axis=1)
+    #     st.dataframe(styled_df, height=800)  # Adjust height as needed
+    #
+    # # Generate plot data for all tiers
+    # plot_data = []
+    # for i, rebate in enumerate(rebate_tiers):
+    #     original_tier = rebate
+    #     tier_label = f"Tier {i + 1}"  # Get the tier label
+    #
+    #     for adjustment in selected_adjustments:
+    #         adjusted_reimbursement = reimbursement * (1 + adjustment / 100)
+    #
+    #         # Calculate Net Price (Contract Price - Rebate $)
+    #         if rebate_type == "W":
+    #             rebate_amount = (original_tier / 100) * wac
+    #         elif rebate_type == 'C':
+    #             rebate_amount = (original_tier / 100) * contract_price
+    #         net_price = contract_price - rebate_amount
+    #
+    #         # Calculate Net Recovery $ (Net Price - Adjusted Reimbursement)
+    #         net_recovery = adjusted_reimbursement - net_price
+    #
+    #         # Calculate NCR % (Net Recovery $ / Net Price * 100)
+    #         ncr_percent = (net_recovery / net_price) * 100
+    #
+    #         plot_data.append({
+    #             "Tier": tier_label,
+    #             "Adjusted Reimbursement ($)": adjusted_reimbursement,
+    #             "NCR %": ncr_percent
+    #         })
+    #
+    # # Convert the plot data to a DataFrame
+    # plot_df = pd.DataFrame(plot_data)
+    #
+    # # Plot the data
+    # fig = px.line(
+    #     plot_df,
+    #     x="Adjusted Reimbursement ($)",
+    #     y="NCR %",
+    #     color="Tier",  # Use the 'Tier' column for coloring
+    #     markers=True,
+    #     title="NCR % vs. Adjusted Reimbursement by Rebate Tier",
+    #     labels={"Adjusted Reimbursement ($)": "Adjusted Reimbursement ($)", "New NCR (%)": "New NCR (%)"}
+    # )
+    #
+    # # Display the plot
+    # st.plotly_chart(fig, use_container_width=True)
 
-            # Calculate Net Recovery $ (Net Price - Adjusted Reimbursement)
-            net_recovery = adjusted_reimbursement - net_price
-
-            # Calculate NCR % (Net Recovery $ / Net Price * 100)
-            ncr_percent = (net_recovery / net_price) * 100
-
-            plot_data.append({
-                "Tier": tier_label,
-                "Adjusted Reimbursement ($)": adjusted_reimbursement,
-                "NCR %": ncr_percent
-            })
-
-    # Convert the plot data to a DataFrame
-    plot_df = pd.DataFrame(plot_data)
-
-    # Plot the data
-    fig = px.line(
-        plot_df,
-        x="Adjusted Reimbursement ($)",
-        y="NCR %",
-        color="Tier",  # Use the 'Tier' column for coloring
-        markers=True,
-        title="NCR % vs. Adjusted Reimbursement by Rebate Tier",
-        labels={"Adjusted Reimbursement ($)": "Adjusted Reimbursement ($)", "New NCR (%)": "New NCR (%)"}
-    )
-
-    # Display the plot
-    st.plotly_chart(fig, use_container_width=True)
-
-if page == "ASP Prediction":
-    st.subheader("ASP Prediction Test with FB Prophet")
