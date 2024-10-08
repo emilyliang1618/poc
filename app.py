@@ -517,27 +517,8 @@ elif page == "NCR Analysis":
             ]
             st.success(f"Removed: {entry_to_remove} from analysis.")
 
-    # Custom CSS to style the button
-    st.markdown("""
-        <style>
-        .custom-button {
-            background-color: #ff6347; /* Tomato color */
-            color: white;
-            font-size: 18px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .custom-button:hover {
-            background-color: #ff4500; /* Darker shade on hover */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-    # Display the button with custom class
-    if st.markdown('<button class="custom-button">Start Over</button>', unsafe_allow_html=True):
+    # Reset button to clear all analysis data
+    if st.button("Start Over"):
         st.session_state.analysis_data.clear()  # Clear analysis data
         st.session_state.rebate_tiers.clear()  # Clear rebate tiers
         st.success("All analysis data has been cleared. You can start over.")
