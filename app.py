@@ -471,7 +471,6 @@ elif page == "NCR Analysis":
                     "Category": selected_category,
                     "Product": selected_product,
                     "GPO": selected_gpo,
-                    "Conversion Factor": f"{conversion_factor:.2f}",
                     "WAC": f"${wac:,}",
                     "Contract Price": f"${contract_price:,}",
                     "% off WAC": f"{percent_off_wac:.2f}%",
