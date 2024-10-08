@@ -363,7 +363,6 @@ elif page == "Unity Roster":
 #NEW
 elif page == "NCR Analysis":
 
-    # Load the data
     @st.cache_data
     def load_data(file_path):
         return pd.read_csv(file_path)
@@ -394,21 +393,28 @@ elif page == "NCR Analysis":
     products = df[df['Product Type'] == selected_category]['Product Name'].unique()
     selected_product = st.selectbox('Select Product', products)
 
-    # Step 3: Select GPO Type
+    # Step 3: Select Material Description
+    material_descriptions = df[(df['Product Type'] == selected_category) &
+                               (df['Product Name'] == selected_product)]['Material Description'].unique()
+    selected_material_description = st.selectbox('Select Material Description', material_descriptions)
+
+    # Step 4: Select GPO Type
     gpo_types = df[(df['Product Type'] == selected_category) &
-                   (df['Product Name'] == selected_product)]['GPO Type'].unique()
+                   (df['Product Name'] == selected_product) &
+                   (df['Material Description'] == selected_material_description)]['GPO Type'].unique()
     selected_gpo = st.selectbox('Select GPO Type', gpo_types)
 
-    # Step 4: Select Report Year and Quarter
+    # Step 5: Select Report Year and Quarter
     years = df['Report Year'].unique()
     quarters = df['Report Quarter'].unique()
     selected_year = st.selectbox('Select Report Year', years)
     selected_quarter = st.selectbox('Select Report Quarter', quarters)
 
-    # Step 5: Get pricing information
-    if selected_product and selected_gpo:
+    # Step 6: Get pricing information
+    if selected_product and selected_gpo and selected_material_description:
         pricing_info = df[(df['Product Type'] == selected_category) &
                           (df['Product Name'] == selected_product) &
+                          (df['Material Description'] == selected_material_description) &
                           (df['GPO Type'] == selected_gpo) &
                           (df['Report Year'] == selected_year) &
                           (df['Report Quarter'] == selected_quarter)].iloc[0]
@@ -432,13 +438,14 @@ elif page == "NCR Analysis":
             ['Contract Price', f"${contract_price:,.2f}"],
             ['Reimbursement', f"${reimbursement:,.2f}"],
             ['Rebate Type', rebate_type],
+            ['Material Description', selected_material_description],
             ['Conversion Factor', f"{conversion_factor:.2f}"]
         ]
 
         # Display the table using st.table
         st.table(pd.DataFrame(pricing_data, columns=['Description', 'Details']).style.hide(axis="index"))
 
-    # Step 6: Collect rebate percentages
+    # Step 7: Collect rebate percentages
     st.write("Enter Rebate Tiers:")
     num_rebate_tiers = st.number_input("Number of rebate tiers", min_value=1, value=1)
     rebate_tiers = []
@@ -450,9 +457,9 @@ elif page == "NCR Analysis":
             st.warning(f"Invalid input for Tier {i + 1}. Please enter a numeric value.")
             rebate_tiers.append(0.0)
 
-    # Step 7: Add to Analysis
+    # Step 8: Add to Analysis
     if st.button("Add to Analysis"):
-        if selected_product and selected_gpo:
+        if selected_product and selected_gpo and selected_material_description:
             percent_off_wac = ((wac - contract_price) / wac) * 100
 
             for tier in rebate_tiers:
@@ -470,6 +477,7 @@ elif page == "NCR Analysis":
                 st.session_state.analysis_data.append({
                     "Category": selected_category,
                     "Product": selected_product,
+                    "Material Description": selected_material_description,  # Add material description
                     "GPO": selected_gpo,
                     "WAC": f"${wac:,}",
                     "Contract Price": f"${contract_price:,}",
@@ -484,15 +492,17 @@ elif page == "NCR Analysis":
                     "NRR %": f"{nrr_percent:.2f}%"
                 })
 
-            st.success(f"Added: {selected_product} with {selected_gpo} to analysis with a Rebate Tier of {tier:.2f}%.")
+            # Update success message to include material description
+            st.success(
+                f"Added: {selected_product} ({selected_material_description}) with {selected_gpo} to analysis with a Rebate Tier of {tier:.2f}%.")
         else:
-            st.warning("Please select both a product and a GPO.")
+            st.warning("Please select a product, material description, and a GPO.")
 
     # Step 8: Option to remove specific entries
     if st.session_state.analysis_data:
-        # Create a set of unique entries for the selectbox
+        # Create a set of unique entries for the selectbox, including Material Description
         unique_entries = set(
-            f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}"
+            f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')} - {item.get('Material Description', 'N/A')} "
             for item in st.session_state.analysis_data
         )
 
@@ -500,18 +510,18 @@ elif page == "NCR Analysis":
         unique_entries = list(unique_entries)
 
 
-        # Define a function to extract product name and rebate percentage for sorting
+        # Define a function to extract product name, rebate percentage, and material description for sorting
         def sort_key(entry):
-            # Split the entry into product, GPO, and rebate percentage
-            product_gpo, rebate_str = entry.rsplit(" - ", 1)
+            # Split the entry into product, GPO, rebate percentage, and material description
+            product_gpo, rebate_str, material_desc = entry.rsplit(" - ", 2)
             # Extract the product name
             product_name = product_gpo.split(" (")[0]
             # Convert rebate percentage to a float for proper numerical sorting
             rebate_percentage = float(rebate_str.replace("%", "").strip()) if rebate_str != 'N/A' else float('inf')
-            return (product_name, rebate_percentage)
+            return (product_name, rebate_percentage, material_desc)
 
 
-        # Sort the entries by product name and then by rebate percentage
+        # Sort the entries by product name, rebate percentage, and material description
         unique_entries.sort(key=sort_key)
 
         # Create the selectbox with the sorted entries
@@ -523,7 +533,8 @@ elif page == "NCR Analysis":
         if st.button("Remove Selected Entry"):
             st.session_state.analysis_data = [
                 item for item in st.session_state.analysis_data
-                if f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')}" != entry_to_remove
+                if
+                f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')} - {item.get('Material Description', 'N/A')}" != entry_to_remove
             ]
             st.success(f"Removed: {entry_to_remove} from analysis.")
 
@@ -571,9 +582,15 @@ elif page == "NCR Analysis":
     # User selects the product and GPO from the analysis results
     selected_product = st.selectbox("Select Product:", analysis_df["Product"].unique())
     selected_gpo = st.selectbox("Select GPO:", analysis_df[analysis_df["Product"] == selected_product]["GPO"].unique())
+    # Add Material Description selection
+    selected_material = st.selectbox("Select Material Description:", analysis_df["Material Description"].unique())
 
-    # Filter the analysis_df for the selected product and GPO to get corresponding rebate tiers and reimbursement
-    filtered_analysis = analysis_df[(analysis_df["Product"] == selected_product) & (analysis_df["GPO"] == selected_gpo)]
+    # Filter the analysis_df for the selected product, GPO, and material description
+    filtered_analysis = analysis_df[
+        (analysis_df["Product"] == selected_product) &
+        (analysis_df["GPO"] == selected_gpo) &
+        (analysis_df["Material Description"] == selected_material)
+        ]
 
     # Create tier labels based on the filtered data (assuming you want the unique Rebate % as tiers)
     if not filtered_analysis.empty:
