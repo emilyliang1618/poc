@@ -500,9 +500,9 @@ elif page == "NCR Analysis":
 
     # Step 8: Option to remove specific entries
     if st.session_state.analysis_data:
-        # Create a set of unique entries for the selectbox, including Material Description
+        # Create a set of unique entries for the selectbox
         unique_entries = set(
-            f"{item['Product']} ({item['GPO']}) - {item['Rebate %']}"
+            f"{item['Product']} ({item['GPO']}) - {item['Material Description']} - {item['Rebate %']}"
             for item in st.session_state.analysis_data
         )
 
@@ -510,18 +510,21 @@ elif page == "NCR Analysis":
         unique_entries = list(unique_entries)
 
 
-        # Define a function to extract product name, rebate percentage, and material description for sorting
+        # Define a function to extract product name, GPO, and rebate percentage for sorting
         def sort_key(entry):
-            # Split the entry into product, GPO, rebate percentage, and material description
-            product_gpo, rebate_str = entry.rsplit(" - ", 2)
-            # Extract the product name
-            product_name = product_gpo.split(" (")[0]
+            # Split the entry into product, GPO, material description, and rebate percentage
+            parts = entry.split(" - ")
+            product_gpo = parts[0]
+            rebate_str = parts[-1]
+            # Extract the product name and GPO
+            product_name, gpo = product_gpo.split(" (")
+            gpo = gpo[:-1]  # Remove the closing parenthesis
             # Convert rebate percentage to a float for proper numerical sorting
             rebate_percentage = float(rebate_str.replace("%", "").strip()) if rebate_str != 'N/A' else float('inf')
-            return (product_name, rebate_percentage)
+            return (product_name, gpo, rebate_percentage)
 
 
-        # Sort the entries by product name, rebate percentage, and material description
+        # Sort the entries by product name, GPO, and rebate percentage
         unique_entries.sort(key=sort_key)
 
         # Create the selectbox with the sorted entries
@@ -534,11 +537,10 @@ elif page == "NCR Analysis":
             st.session_state.analysis_data = [
                 item for item in st.session_state.analysis_data
                 if not (
-                        f"{item['Product']} ({item['GPO']}) - {item['Rebate %']}" == entry_to_remove
+                        f"{item['Product']} ({item['GPO']}) - {item['Material Description']} - {item['Rebate %']}" == entry_to_remove
                 )
             ]
 
-            # Debugging output after removal
             st.success(f"Removed: {entry_to_remove} from analysis.")
 
     # Reset button to clear all analysis data
