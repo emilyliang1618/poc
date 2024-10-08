@@ -364,19 +364,26 @@ elif page == "NCR Analysis":
 
     # Load the data
     @st.cache_data
-    def load_data():
-        return pd.read_csv('data.csv')
+    def load_data(file_path):
+        return pd.read_csv(file_path)
 
 
-    df = load_data()
+    # Path to the CSV file
+    csv_file_path = 'data.csv'
 
-    st.title('NCR Analysis')
+    # Get the last modified time of the CSV file
+    last_modified_time = os.path.getmtime(csv_file_path)
+
+    # Load the data with the file path as a dependency
+    df = load_data(csv_file_path)
 
     # Initialize session state for analysis data if it doesn't exist
     if 'analysis_data' not in st.session_state:
         st.session_state.analysis_data = []
     if 'rebate_tiers' not in st.session_state:
         st.session_state.rebate_tiers = []
+
+    st.title('NCR Analysis')
 
     # Step 1: Select Product Type (Category)
     product_types = df['Product Type'].unique()
@@ -408,6 +415,7 @@ elif page == "NCR Analysis":
         product_usage = pricing_info['Product Usage']  # 'Oral' or 'Injectable'
         wac = pricing_info['WAC per Unit']
         contract_price = pricing_info['Contract per Unit']
+        conversion_factor = pricing_info['Conversion Factor']
 
         if product_usage == 'Oral':
             reimbursement = pricing_info['AWP']
@@ -423,6 +431,7 @@ elif page == "NCR Analysis":
             ['Contract Price', f"${contract_price:,.2f}"],
             ['Reimbursement', f"${reimbursement:,.2f}"],
             ['Rebate Type', rebate_type],
+            ['Conversion Factor', f"{conversion_factor:.2f}"]
         ]
 
         # Display the table using st.table
@@ -433,7 +442,7 @@ elif page == "NCR Analysis":
     num_rebate_tiers = st.number_input("Number of rebate tiers", min_value=1, value=1)
     rebate_tiers = []
     for i in range(num_rebate_tiers):
-        tier = st.text_input(f"Rebate Tier {i + 1} (%)", value="10.0", key=f"tier_{i}")
+        tier = st.text_input(f"Rebate Tier {i + 1} (%)", value="0.0", key=f"tier_{i}")
         try:
             rebate_tiers.append(float(tier))
         except ValueError:
@@ -461,6 +470,7 @@ elif page == "NCR Analysis":
                     "Category": selected_category,
                     "Product": selected_product,
                     "GPO": selected_gpo,
+                    "Conversion Factor": f"{conversion_factor:.2f}",
                     "WAC": f"${wac:,}",
                     "Contract Price": f"${contract_price:,}",
                     "% off WAC": f"{percent_off_wac:.2f}%",
@@ -474,7 +484,7 @@ elif page == "NCR Analysis":
                     "NRR %": f"{nrr_percent:.2f}%"
                 })
 
-            st.success(f"Added: {selected_product} with {selected_gpo} to analysis!")
+            st.success(f"Added: {selected_product} with {selected_gpo} to analysis with a Rebate Tier of {tier:.2f}%.")
         else:
             st.warning("Please select both a product and a GPO.")
 
