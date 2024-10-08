@@ -563,8 +563,8 @@ elif page == "NCR Analysis":
         st.warning("No tiers available for the selected product and GPO.")
 
     # Allow user to specify the range of adjustments with a slider
-    min_adjustment = -15
-    max_adjustment = 15
+    min_adjustment = -10
+    max_adjustment = 10
     step = 1
     selected_range = st.slider(
         "Select Reimbursement Adjustment Range (%):",
