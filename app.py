@@ -408,7 +408,7 @@ elif page == "NCR Analysis":
         product_usage = pricing_info['Product Usage']  # 'Oral' or 'Injectable'
         wac = pricing_info['WAC per Unit']
         contract_price = pricing_info['Contract per Unit']
-        conversion_factor = pricing_info['Conversion Factor']
+        conversion_factor = pricing_info['Coversion Factor']
 
         if product_usage == 'Oral':
             reimbursement = pricing_info['AWP']
