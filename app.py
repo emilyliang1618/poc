@@ -238,7 +238,7 @@ def to_excel(df, sheet_name='Rosters'):
 
 #Streamlit Application
 st.sidebar.title("Select a POC")
-page = st.sidebar.radio("", ["Eli Lilly Roster", "Genentech Roster", "Unity Roster", "NCR Analysis", "ASP Prediction"])
+page = st.sidebar.radio("", ["Eli Lilly Roster", "Genentech Roster", "Unity Roster", "NCR Analysis"])
 
 if page == "Eli Lilly Roster":
     st.subheader("Create Roster for Eli Lilly")
