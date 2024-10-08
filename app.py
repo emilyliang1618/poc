@@ -582,7 +582,7 @@ elif page == "NCR Analysis":
     st.markdown("---")
 
     # Step 11: What-If Analysis
-    st.subheader("What-If Analysis: Adjust Reimbursement")
+    st.subheader("What-If Analysis: Adjust Reimbursement %")
 
     # User selects the product and GPO from the analysis results
     selected_product = st.selectbox("Select Product:", analysis_df["Product"].unique())
