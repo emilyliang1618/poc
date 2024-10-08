@@ -502,7 +502,7 @@ elif page == "NCR Analysis":
     if st.session_state.analysis_data:
         # Create a set of unique entries for the selectbox, including Material Description
         unique_entries = set(
-            f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')} - {item.get('Material Description', 'N/A')} "
+            f"{item['Product']} ({item['GPO']}) - {item['Rebate %']}"
             for item in st.session_state.analysis_data
         )
 
@@ -513,12 +513,12 @@ elif page == "NCR Analysis":
         # Define a function to extract product name, rebate percentage, and material description for sorting
         def sort_key(entry):
             # Split the entry into product, GPO, rebate percentage, and material description
-            product_gpo, rebate_str, material_desc = entry.rsplit(" - ", 2)
+            product_gpo, rebate_str = entry.rsplit(" - ", 2)
             # Extract the product name
             product_name = product_gpo.split(" (")[0]
             # Convert rebate percentage to a float for proper numerical sorting
             rebate_percentage = float(rebate_str.replace("%", "").strip()) if rebate_str != 'N/A' else float('inf')
-            return (product_name, rebate_percentage, material_desc)
+            return (product_name, rebate_percentage)
 
 
         # Sort the entries by product name, rebate percentage, and material description
@@ -533,9 +533,12 @@ elif page == "NCR Analysis":
         if st.button("Remove Selected Entry"):
             st.session_state.analysis_data = [
                 item for item in st.session_state.analysis_data
-                if
-                f"{item['Product']} ({item['GPO']}) - {item.get('Rebate %', 'N/A')} - {item.get('Material Description', 'N/A')}" != entry_to_remove
+                if not (
+                        f"{item['Product']} ({item['GPO']}) - {item['Rebate %']}" == entry_to_remove
+                )
             ]
+
+            # Debugging output after removal
             st.success(f"Removed: {entry_to_remove} from analysis.")
 
     # Reset button to clear all analysis data
